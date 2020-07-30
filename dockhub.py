@@ -155,7 +155,7 @@ def add_group_to_repo(auth_header, dh_group, dh_repo, group_id):
                               headers=additional_headers,
                               json=add_group_json)
     if add_group.status_code == 200:
-        if add_group.json()[0]['group_id'] == group_id:
+        if add_group.json()['group_id'] == group_id:
             print(f'Granted {dh_group} write access to {dh_repo}')
         else:
             die(f'Unknown error adding {dh_group} to {dh_repo}')
