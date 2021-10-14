@@ -18,7 +18,7 @@ it should be quite adaptable to anyone else's needs.
   1. Create virtualenv (or whatever you prefer for I-downloaded-it-from-the-internet code)
   1. Activate your venv
   1. cd \<checkout dir\>
-  1. run `pip install .`
+  1. run `pip install -e .`
 
 ## Usage:
 
