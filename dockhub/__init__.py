@@ -1,12 +1,13 @@
-#!/usr/bin/env python3
-
-from functools import wraps
-import json
-from os import getenv
-import sys
+#!/usr/bin/env python
 
 import click
+import json
 import requests
+import sys
+
+
+from os import getenv
+from functools import wraps
 
 
 CONTENT_HEADER = {"Content-Type": "application/json", "charset": "utf-8"}
@@ -67,7 +68,7 @@ def get_auth_token():
 @handle_http_errors
 def get_group_id(auth_header, dh_group):
     # We need the group id to add the group to the repo later on
-    docker_api_url = f"{DOCKERHUB_URL}/orgs/mozilla/groups/{dh_group}"
+    docker_api_url = f"{DOCKERHUB_URL}/orgs/{DOCKERHUB_ORG}/groups/{dh_group}"
     group = requests.get(docker_api_url, headers=auth_header)
     if group.status_code == 200:
         return group.json()["id"]
@@ -77,7 +78,7 @@ def get_group_id(auth_header, dh_group):
 
 @handle_http_errors
 def dump_group_info(auth_header, dh_group):
-    group_url = f"{DOCKERHUB_URL}/orgs/mozilla/groups/{dh_group}"
+    group_url = f"{DOCKERHUB_URL}/orgs/{DOCKERHUB_ORG}/groups/{dh_group}"
     group_members_url = f"{group_url}/members"
 
     group = requests.get(group_url, headers=auth_header)
@@ -97,7 +98,9 @@ def dump_group_info(auth_header, dh_group):
 
 @handle_http_errors
 def add_user_to_group(auth_header, dh_user, dh_group, group_id):
-    group_members_url = f"{DOCKERHUB_URL}/orgs/mozilla/groups/{dh_group}/members/"
+    group_members_url = (
+        f"{DOCKERHUB_URL}/orgs/{DOCKERHUB_ORG}/groups/{dh_group}/members/"
+    )
     additional_headers = {**auth_header, **CONTENT_HEADER}
     add_user_json = {"member": dh_user}
 
@@ -137,9 +140,11 @@ def dump_user_info(auth_header, dh_user):
 
 @handle_http_errors
 def remove_user_from_group(auth_header, dh_user, dh_group):
-    group_members_url = f"{DOCKERHUB_URL}/orgs/mozilla/groups/{dh_group}/members"
+    group_members_url = (
+        f"{DOCKERHUB_URL}/orgs/{DOCKERHUB_ORG}/groups/{dh_group}/members"
+    )
     user_group_members_url = (
-        f"{DOCKERHUB_URL}/orgs/mozilla/groups/{dh_group}/members/{dh_user}"
+        f"{DOCKERHUB_URL}/orgs/{DOCKERHUB_ORG}/groups/{dh_group}/members/{dh_user}"
     )
     additional_headers = {**auth_header, **CONTENT_HEADER}
 
@@ -162,7 +167,7 @@ def remove_user_from_group(auth_header, dh_user, dh_group):
 
 @handle_http_errors
 def add_group_to_repo(auth_header, dh_group, dh_repo, group_id):
-    docker_api_url = f"{DOCKERHUB_URL}/repositories/mozilla/{dh_repo}/groups/"
+    docker_api_url = f"{DOCKERHUB_URL}/repositories/{DOCKERHUB_ORG}/{dh_repo}/groups/"
     additional_headers = {**auth_header, **CONTENT_HEADER}
     add_group_json = {"group_id": group_id, "permission": "write"}
 
@@ -181,7 +186,7 @@ def add_group_to_repo(auth_header, dh_group, dh_repo, group_id):
 @handle_http_errors
 def dump_repo_info(auth_header, dh_repo):
     # We're only gonna dump permissions and basic stats for the repo
-    repo_url = f"{DOCKERHUB_URL}/repositories/mozilla/{dh_repo}"
+    repo_url = f"{DOCKERHUB_URL}/repositories/{DOCKERHUB_ORG}/{dh_repo}"
     repo_permissions_url = f"{repo_url}/groups/"
 
     repo = requests.get(repo_url, headers=auth_header)
@@ -202,27 +207,6 @@ def remove_group_from_repo(auth_header, dh_group):
 
 @click.command()
 @click.option(
-    "-r",
-    "--dh_repo",
-    default=None,
-    help="DockerHub repo you want to add the group to with r/w access",
-    required=False,
-)
-@click.option(
-    "-g",
-    "--dh_group",
-    default=None,
-    help="DockerHub group you want to add a user to",
-    required=False,
-)
-@click.option(
-    "-u",
-    "--dh_user",
-    default=None,
-    help="DockerHub user you want to add to the group (most likely, mzcs<something>)",
-    required=False,
-)
-@click.option(
     "-a",
     "--action",
     default="list",
@@ -238,7 +222,35 @@ def remove_group_from_repo(auth_header, dh_group):
     help="Force the action of removing a group from a repo. Only group and repo can be set when using this option",
     required=False,
 )
-def main(dh_repo, dh_group, dh_user, action, force):
+@click.option(
+    "-g",
+    "--dh_group",
+    default=None,
+    help="DockerHub group you want to add a user to",
+    required=False,
+)
+@click.option(
+    "-o",
+    "--org",
+    default=None,
+    help="Dockerhub organization you're working in",
+    required=False,
+)
+@click.option(
+    "-r",
+    "--dh_repo",
+    default=None,
+    help="DockerHub repo you want to add the group to with r/w access",
+    required=False,
+)
+@click.option(
+    "-u",
+    "--dh_user",
+    default=None,
+    help="DockerHub user you want to add to the group (most likely, mzcs<something>)",
+    required=False,
+)
+def main(action, dh_group, dh_repo, dh_user, force, org):
     """
     For this script to work properly, You'll need to export your DockerHub Username and
     password (DH_USERNAME/DH_PASSWORD) in your ENV.
@@ -252,6 +264,13 @@ def main(dh_repo, dh_group, dh_user, action, force):
     repos.
 
     """
+    if org is not None:
+        DOCKERHUB_ORG = org
+    else:
+        DOCKERHUB_ORG = "mozilla"
+
+    global DOCKERHUB_ORG
+
     token = get_auth_token()
     auth_header = {"Authorization": f"JWT {token}"}
     if action == "list":
